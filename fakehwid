@@ -22,11 +22,12 @@ local Aimbot = {
     _lastSwitch = 0
 }
 
-local function IsNumberName(name)
-    return tonumber(name) ~= nil
+
+local function isNumeric(str)
+    return tonumber(str) ~= nil
 end
 
-local function GetAllTargets()
+local function getAllTargets()
     local targets = {}
 
     for _, player in ipairs(Players:GetPlayers()) do
@@ -43,7 +44,7 @@ local function GetAllTargets()
     local botFolder = workspace:FindFirstChild("__THINGS") and workspace.__THINGS:FindFirstChild("__ENTITIES")
     if botFolder then
         for _, model in ipairs(botFolder:GetChildren()) do
-            if model:IsA("Model") and IsNumberName(model.Name) then
+            if model:IsA("Model") and isNumeric(model.Name) then
                 table.insert(targets, {
                     Character = model,
                     Team = nil,
@@ -58,10 +59,10 @@ local function GetAllTargets()
 end
 
 Aimbot.GetClosestPlayer = function()
-    local closest, shortest = nil, math.huge
     local mouse = UserInputService:GetMouseLocation()
+    local closest, shortest = nil, math.huge
 
-    for _, data in ipairs(GetAllTargets()) do
+    for _, data in ipairs(getAllTargets()) do
         local char = data.Character
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         local part = char:FindFirstChild(Aimbot.LockPart)
@@ -69,8 +70,9 @@ Aimbot.GetClosestPlayer = function()
         if not part or not humanoid or humanoid.Health <= 0 then continue end
 
         if not data.IsBot and Aimbot.TeamCheck then
-            local myTeam = LocalPlayer.Team
-            if myTeam and data.Team and myTeam == data.Team then continue end
+            if LocalPlayer.Team and data.Team and LocalPlayer.Team == data.Team then
+                continue
+            end
         end
 
         if Aimbot.WallCheck then
@@ -80,8 +82,9 @@ Aimbot.GetClosestPlayer = function()
             if #Camera:GetPartsObscuringTarget({part.Position}, ignore) > 0 then continue end
         end
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-        if not onScreen then continue end
+        -- Crosshair/FOV targeting
+        local screenPos, visible = Camera:WorldToViewportPoint(part.Position)
+        if not visible then continue end
 
         local dist = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
         if dist < shortest then
@@ -106,7 +109,6 @@ local function AimAt()
     local char = target.Character
     local part = char:FindFirstChild(Aimbot.LockPart)
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-
     if not part or not humanoid or humanoid.Health <= 0 then
         Aimbot.Locked = nil
         return
@@ -114,8 +116,8 @@ local function AimAt()
 
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
     local dropY = 0
-    if distance > 100 then
-        dropY = math.clamp((distance - 70000000) ^ 1.1 * 0.015, 0, 14)
+    if distance > 35 then
+        dropY = math.clamp(math.log10(distance - 30) * 4.5, 0, 14)
     end
 
     local aimPos = part.Position + Vector3.new(0, dropY, 0)
