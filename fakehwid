@@ -1,29 +1,3 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-
---// Settings
-local Aimbot = {
-    Enabled = true,
-    Toggle = false,
-    Running = false,
-    Locked = nil,
-    LockPart = "Head",
-    LockMode = 1, 
-    Sensitivity = 0.1,
-    Sensitivity2 = 3.5,
-    TriggerKey = Enum.KeyCode.R, -- Default to R
-    TeamCheck = true,
-    WallCheck = true,
-    SwitchCooldown = 0.25,
-}
-
-local LastSwitch = 0
-
 local function GetClosestTarget()
     local closest, shortest = nil, math.huge
     local mouse = UserInputService:GetMouseLocation()
@@ -36,20 +10,26 @@ local function GetClosestTarget()
         local part = char:FindFirstChild(Aimbot.LockPart)
 
         if not humanoid or humanoid.Health <= 0 or not part then continue end
-        if Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
 
+        -- ✅ Team check (but support free-for-all)
+        local myTeam, theirTeam = LocalPlayer.Team, player.Team
+        if Aimbot.TeamCheck and myTeam and theirTeam and myTeam == theirTeam then
+            continue
+        end
+
+        -- ✅ Wall check
         if Aimbot.WallCheck then
             local ignore = {}
             for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do table.insert(ignore, v) end
             for _, v in ipairs(char:GetDescendants()) do table.insert(ignore, v) end
-            local parts = Camera:GetPartsObscuringTarget({part.Position}, ignore)
-            if #parts > 0 then continue end
+            if #Camera:GetPartsObscuringTarget({part.Position}, ignore) > 0 then continue end
         end
 
+        -- ✅ Crosshair distance (not world distance)
         local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
         if not onScreen then continue end
-        local dist = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
 
+        local dist = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
         if dist < shortest then
             closest = player
             shortest = dist
@@ -77,8 +57,9 @@ local function AimAt()
         return
     end
 
+    -- ✅ Bullet drop based on effective range
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
-    local dropY = distance > 45 and math.clamp((distance ^ 1.15) * 0.0045, 0, 10) or 0
+    local dropY = distance > 35 and math.clamp(math.log10(distance - 45) * 5.2, 0, 13) or 0
     local aimPos = part.Position + Vector3.new(0, dropY, 0)
 
     if Aimbot.LockMode == 2 then
@@ -95,25 +76,3 @@ local function AimAt()
         end
     end
 end
-
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Aimbot.TriggerKey then
-        if Aimbot.Toggle then
-            Aimbot.Running = not Aimbot.Running
-            if not Aimbot.Running then Aimbot.Locked = nil end
-        else
-            Aimbot.Running = true
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if Aimbot.Toggle then return end
-    if input.KeyCode == Aimbot.TriggerKey then
-        Aimbot.Running = false
-        Aimbot.Locked = nil
-    end
-end)
-
-RunService.RenderStepped:Connect(AimAt)
-return Aimbot
