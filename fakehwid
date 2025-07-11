@@ -46,7 +46,7 @@ local function AimAt()
 
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
     local dropY = 0
-    if distance > 50 then
+    if distance > 1000000 then
         dropY = math.clamp((distance - 50) ^ 1.1 * 0.015, 0, 14)
     end
 
