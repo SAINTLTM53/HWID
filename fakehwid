@@ -24,6 +24,10 @@ local Aimbot = {
 
 Aimbot.GetClosestPlayer = function() end
 
+local function getCharacter()
+    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+
 local function AimAt()
     if not Aimbot.Enabled or not Aimbot.Running then return end
 
@@ -41,7 +45,6 @@ local function AimAt()
     end
 
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
-
     local dropY = 0
     if distance > 50 then
         dropY = math.clamp((distance - 50) ^ 1.1 * 0.015, 0, 14)
@@ -81,6 +84,10 @@ UserInputService.InputEnded:Connect(function(input)
         Aimbot.Running = false
         Aimbot.Locked = nil
     end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    Aimbot.Locked = nil
 end)
 
 RunService.RenderStepped:Connect(AimAt)
