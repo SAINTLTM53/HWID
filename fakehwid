@@ -2,9 +2,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 local EntityFolder = workspace:WaitForChild("__THINGS"):WaitForChild("__ENTITIES")
 
 local Aimbot = {
@@ -13,7 +12,7 @@ local Aimbot = {
     Running = false,
     Locked = nil,
     LockPart = "Head",
-    LockMode = 1,
+    LockMode = 1, -- 1 = CFrame aim, 2 = mousemoverel
     Sensitivity = 0.1,
     Sensitivity2 = 3.5,
     TriggerKey = Enum.KeyCode.R,
@@ -28,24 +27,28 @@ local function isNumeric(str)
 end
 
 Aimbot.GetClosestPlayer = function()
-    local closest, shortest = nil, math.huge
+    local closest = nil
+    local shortest = math.huge
     local mouse = UserInputService:GetMouseLocation()
 
-    local function checkTarget(target, part)
+    local function evaluateTarget(targetModel)
+        local part = targetModel:FindFirstChild(Aimbot.LockPart) or targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChild("Head")
+        if not part then return end
+
         local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
         if not onScreen then return end
 
         if Aimbot.WallCheck then
             local ignore = {}
             for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do table.insert(ignore, v) end
-            for _, v in ipairs(target:GetDescendants()) do table.insert(ignore, v) end
+            for _, v in ipairs(targetModel:GetDescendants()) do table.insert(ignore, v) end
             if #Camera:GetPartsObscuringTarget({part.Position}, ignore) > 0 then return end
         end
 
-        local dist = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-        if dist < shortest then
-            closest = { Character = target }
-            shortest = dist
+        local distance = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+        if distance < shortest then
+            closest = targetModel
+            shortest = distance
         end
     end
 
@@ -55,18 +58,14 @@ Aimbot.GetClosestPlayer = function()
 
         local char = player.Character
         local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-        local part = char and char:FindFirstChild(Aimbot.LockPart)
-
-        if char and humanoid and humanoid.Health > 0 and part then
-            checkTarget(char, part)
+        if char and humanoid and humanoid.Health > 0 then
+            evaluateTarget(char)
         end
     end
 
     for _, bot in ipairs(EntityFolder:GetChildren()) do
-        if not isNumeric(bot.Name) or not bot:IsA("Model") then continue end
-        local part = bot:FindFirstChild(Aimbot.LockPart) or bot:FindFirstChild("HumanoidRootPart") or bot:FindFirstChild("Head")
-        if part then
-            checkTarget(bot, part)
+        if isNumeric(bot.Name) and bot:IsA("Model") then
+            evaluateTarget(bot)
         end
     end
 
@@ -80,16 +79,11 @@ local function AimAt()
     if not Aimbot.Enabled or not Aimbot.Running then return end
 
     Aimbot.GetClosestPlayer()
-    local target = Aimbot.Locked
-    if not target or not target.Character then return end
+    local targetModel = Aimbot.Locked
+    if not targetModel then return end
 
-    local char = target.Character
-    local part = char:FindFirstChild(Aimbot.LockPart) or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-
-    if not part then
-        Aimbot.Locked = nil
-        return
-    end
+    local part = targetModel:FindFirstChild(Aimbot.LockPart) or targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChild("Head")
+    if not part then Aimbot.Locked = nil return end
 
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
     local dropY = distance > 10000000 and math.clamp(math.log10(distance - 10000000) * 5.2, 0, 13) or 0
