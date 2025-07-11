@@ -41,7 +41,10 @@ local function AimAt()
     end
 
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
-    local dropY = distance > 35 and math.clamp(math.log10(distance - 45) * 5.2, 0, 13) or 0
+    local dropY = 0
+    if distance > 50 then
+    dropY = math.clamp((distance - 50) ^ 1.15 * 0.015, 0, 10)
+    end
     local aimPos = part.Position + Vector3.new(0, dropY, 0)
 
     if Aimbot.LockMode == 2 then
