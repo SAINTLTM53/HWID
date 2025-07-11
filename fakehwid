@@ -16,7 +16,7 @@ local Aimbot = {
     LockMode = 1, 
     Sensitivity = 0.1,
     Sensitivity2 = 3.5,
-    TriggerKey = Enum.UserInputType.MouseButton2,
+    TriggerKey = Enum.KeyCode.R, -- Default to R
     TeamCheck = true,
     WallCheck = true,
     SwitchCooldown = 0.25,
@@ -90,9 +90,7 @@ local function AimAt()
 end
 
 UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Aimbot.TriggerKey
-        or input.UserInputType == Aimbot.TriggerKey then
-
+    if input.KeyCode == Aimbot.TriggerKey then
         if Aimbot.Toggle then
             Aimbot.Running = not Aimbot.Running
             if not Aimbot.Running then Aimbot.Locked = nil end
@@ -104,9 +102,7 @@ end)
 
 UserInputService.InputEnded:Connect(function(input)
     if Aimbot.Toggle then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Aimbot.TriggerKey
-        or input.UserInputType == Aimbot.TriggerKey then
-
+    if input.KeyCode == Aimbot.TriggerKey then
         Aimbot.Running = false
         Aimbot.Locked = nil
     end
