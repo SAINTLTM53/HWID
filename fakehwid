@@ -38,7 +38,6 @@ local function GetClosestTarget()
         if not humanoid or humanoid.Health <= 0 or not part then continue end
         if Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
 
-        -- wall check (camera visibility)
         if Aimbot.WallCheck then
             local ignore = {}
             for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do table.insert(ignore, v) end
@@ -47,7 +46,6 @@ local function GetClosestTarget()
             if #parts > 0 then continue end
         end
 
-        -- screen-space distance to mouse (better than world distance)
         local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
         if not onScreen then continue end
         local dist = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
@@ -79,9 +77,8 @@ local function AimAt()
         return
     end
 
-    -- smooth bullet drop curve that starts after ~25 studs
     local distance = (Camera.CFrame.Position - part.Position).Magnitude
-    local dropY = distance > 25 and math.clamp((distance ^ 1.15) * 0.0025, 0, 10) or 0
+    local dropY = distance > 45 and math.clamp((distance ^ 1.15) * 0.0045, 0, 10) or 0
     local aimPos = part.Position + Vector3.new(0, dropY, 0)
 
     if Aimbot.LockMode == 2 then
