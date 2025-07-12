@@ -2,9 +2,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 
 local Aimbot = {
     Enabled = true,
@@ -22,35 +23,25 @@ local Aimbot = {
     _lastSwitch = 0
 }
 
-
-local function isNumeric(str)
-    return tonumber(str) ~= nil
+local function isBot(model)
+    return model:IsA("Model") and tonumber(model.Name) ~= nil
 end
 
-local function getAllTargets()
+local function getTargets()
     local targets = {}
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            table.insert(targets, {
-                Character = player.Character,
-                Team = player.Team,
-                IsBot = false,
-                Player = player
-            })
+            table.insert(targets, {Type = "Player", Object = player})
         end
     end
 
-    local botFolder = workspace:FindFirstChild("__THINGS") and workspace.__THINGS:FindFirstChild("__ENTITIES")
+    -- Add bots from __THINGS.__ENTITIES
+    local botFolder = Workspace:FindFirstChild("__THINGS") and Workspace.__THINGS:FindFirstChild("__ENTITIES")
     if botFolder then
-        for _, model in ipairs(botFolder:GetChildren()) do
-            if model:IsA("Model") and isNumeric(model.Name) then
-                table.insert(targets, {
-                    Character = model,
-                    Team = nil,
-                    IsBot = true,
-                    Player = nil
-                })
+        for _, bot in ipairs(botFolder:GetChildren()) do
+            if isBot(bot) and bot:FindFirstChildOfClass("Humanoid") and bot:FindFirstChild("HumanoidRootPart") then
+                table.insert(targets, {Type = "Bot", Object = bot})
             end
         end
     end
@@ -62,65 +53,62 @@ Aimbot.GetClosestPlayer = function()
     local mouse = UserInputService:GetMouseLocation()
     local closest, shortest = nil, math.huge
 
-    for _, data in ipairs(getAllTargets()) do
-        local char = data.Character
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        local part = char:FindFirstChild(Aimbot.LockPart)
+    for _, data in ipairs(getTargets()) do
+        local char, humanoid, team
+        local part = nil
 
-        if not part or not humanoid or humanoid.Health <= 0 then continue end
-
-        if not data.IsBot and Aimbot.TeamCheck then
-            if LocalPlayer.Team and data.Team and LocalPlayer.Team == data.Team then
-                continue
-            end
+        if data.Type == "Player" then
+            local player = data.Object
+            char = player.Character
+            humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            team = player.Team
+        else
+            char = data.Object
+            humanoid = char:FindFirstChildOfClass("Humanoid")
+            team = nil
         end
+
+        part = char and char:FindFirstChild(Aimbot.LockPart)
+
+        if not char or not humanoid or humanoid.Health <= 0 or not part then continue end
+        if Aimbot.TeamCheck and team and team == LocalPlayer.Team then continue end
 
         if Aimbot.WallCheck then
             local ignore = {}
-            for _, v in ipairs((LocalPlayer.Character or {}):GetDescendants()) do table.insert(ignore, v) end
+            for _, v in ipairs(getCharacter():GetDescendants()) do table.insert(ignore, v) end
             for _, v in ipairs(char:GetDescendants()) do table.insert(ignore, v) end
             if #Camera:GetPartsObscuringTarget({part.Position}, ignore) > 0 then continue end
         end
 
-        -- Crosshair/FOV targeting
         local screenPos, visible = Camera:WorldToViewportPoint(part.Position)
         if not visible then continue end
 
         local dist = (mouse - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
         if dist < shortest then
-            closest = data
+            Aimbot.Locked = {
+                Character = char,
+                Humanoid = humanoid,
+                Part = part
+            }
             shortest = dist
         end
-    end
-
-    if closest and tick() - Aimbot._lastSwitch >= Aimbot.SwitchCooldown then
-        Aimbot.Locked = closest
-        Aimbot._lastSwitch = tick()
     end
 end
 
 local function AimAt()
     if not Aimbot.Enabled or not Aimbot.Running then return end
-
     Aimbot.GetClosestPlayer()
-    local target = Aimbot.Locked
-    if not target or not target.Character then return end
 
-    local char = target.Character
-    local part = char:FindFirstChild(Aimbot.LockPart)
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not part or not humanoid or humanoid.Health <= 0 then
+    local lock = Aimbot.Locked
+    if not lock or not lock.Character or not lock.Humanoid or not lock.Part then return end
+    if lock.Humanoid.Health <= 0 then
         Aimbot.Locked = nil
         return
     end
 
-    local distance = (Camera.CFrame.Position - part.Position).Magnitude
-    local dropY = 0
-    if distance > 35 then
-        dropY = math.clamp(math.log10(distance - 30) * 4.5, 0, 14)
-    end
-
-    local aimPos = part.Position + Vector3.new(0, dropY, 0)
+    local distance = (Camera.CFrame.Position - lock.Part.Position).Magnitude
+    local dropY = distance > 7000000000000 and math.clamp(math.log10(distance - 7000000000000) * 5.2, 0, 13) or 0
+    local aimPos = lock.Part.Position + Vector3.new(0, dropY, 0)
 
     if Aimbot.LockMode == 2 then
         local screen = Camera:WorldToViewportPoint(aimPos)
@@ -138,7 +126,7 @@ local function AimAt()
 end
 
 UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Aimbot.TriggerKey then
+    if input.KeyCode == Aimbot.TriggerKey then
         if Aimbot.Toggle then
             Aimbot.Running = not Aimbot.Running
             if not Aimbot.Running then Aimbot.Locked = nil end
@@ -149,8 +137,7 @@ UserInputService.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if Aimbot.Toggle then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Aimbot.TriggerKey then
+    if not Aimbot.Toggle and input.KeyCode == Aimbot.TriggerKey then
         Aimbot.Running = false
         Aimbot.Locked = nil
     end
